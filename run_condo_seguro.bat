@@ -12,6 +12,6 @@ echo   - Vecino (Casa 1):           vecino1@aromos.cl / vecino123
 echo.
 echo   Abriendo navegador web...
 start http://localhost:8000
-cd /d "C:\Users\Acer\condo_seguro"
+cd /d "%~dp0"
 python server.py
 pause
