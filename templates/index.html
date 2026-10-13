@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CondoSeguro Chile - Red de Seguridad y Comunidad Vecinal</title>
+    <meta name="theme-color" content="#f8fafc">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- GSAP Animation Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #masterplanViewport {
+            position: relative;
+            height: 520px;
+            width: 100%;
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
+            cursor: crosshair;
+            background: #f1f5f9;
+        }
+        #masterplanCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            transition: transform 0.05s ease-out;
+        }
+        .map-interactive-pin {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            cursor: pointer;
+            z-index: 40;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .map-interactive-pin:hover {
+            transform: translate(-50%, -115%) scale(1.2);
+            z-index: 50;
+        }
+        .clean-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease-in-out;
+        }
+        .clean-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        }
+        .sos-btn-pulse {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-red {
+            to {
+                box-shadow: 0 0 0 26px rgba(239, 68, 68, 0);
+            }
+        }
+        .nav-tab.active {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+        /* Mapa vectorial arquitectónico */
+        .map-zone {
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+        .map-zone:hover {
+            filter: brightness(0.95);
+        }
+        .radar-pin {
+            animation: radar 2s infinite ease-out;
+        }
+        @keyframes radar {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(3.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="pb-28">
+
+    <!-- Header Principal en Colores Claros -->
+    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-sm">
+        <div class="max-w-3xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-xl shadow-inner">
+                    🛡️
+                </div>
+                <div>
+                    <h1 class="text-base font-black tracking-tight text-slate-900 flex items-center gap-1.5">
+                        CONDO<span class="text-blue-600">SEGURO</span>
+                        <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-extrabold border border-blue-200">CHILE</span>
+                    </h1>
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold">
+                        <span id="headerCondoName" class="truncate max-w-[170px] sm:max-w-xs">Condominio Los Aromos</span>
+                        <span>•</span>
+                        <span id="headerCondoTypeBadge" class="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 text-[10px]">🏡 Casas</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <div id="userBadge" class="hidden text-right">
+                    <p class="text-xs font-bold text-slate-800 truncate max-w-[120px]" id="headerUserName">Usuario</p>
+                    <span class="text-[11px] text-blue-600 font-bold" id="headerUserUnit">Casa 1</span>
+                </div>
+                <button onclick="toggleAuthModal()" id="btnAuthAction" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300 font-bold transition">
+                    Acceder
+                </button>
+            </div>
+        </div>
+
+        <!-- Banner de Notificación Dinámico -->
+        <div id="alertBanner" class="max-w-3xl mx-auto mt-2 hidden transition-all duration-300">
+            <div id="alertBannerInner" class="text-xs p-3 rounded-xl border flex items-center justify-between shadow-md">
+                <span id="alertBannerMsg"></span>
+                <button onclick="document.getElementById('alertBanner').classList.add('hidden')" class="ml-2 font-bold text-slate-500 hover:text-slate-800">✕</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Barra de Navegación de Pestañas con Iconos -->
+    <nav class="max-w-3xl mx-auto px-4 mt-3">
+        <div class="grid grid-cols-5 gap-1 p-1 bg-slate-200/80 rounded-xl text-xs text-center border border-slate-300/60 font-semibold" id="navTabsContainer">
+            <button id="tabBtnSOS" onclick="switchTab('tabSOS')" class="nav-tab active py-2 rounded-lg transition">🚨 SOS</button>
+            <button id="tabBtnMap" onclick="switchTab('tabMap')" class="nav-tab py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">🗺️ Mapa</button>
+            <button id="tabBtnCommunity" onclick="switchTab('tabCommunity')" class="nav-tab py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">📦 Comunidad</button>
+            <button id="tabBtnPredictive" onclick="switchTab('tabPredictive')" class="nav-tab py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">💡 Mejoras</button>
+            <button id="tabBtnAdmin" onclick="switchTab('tabAdmin')" class="nav-tab py-2 rounded-lg text-slate-600 hover:text-slate-900 transition hidden">👑 Gestión</button>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <main class="max-w-3xl mx-auto px-4 py-4 space-y-4">
+
+        <!-- ================= PESTAÑA 1: SOS Y EMERGENCIAS OFICIALES ================= -->
+        <section id="tabSOS" class="space-y-4 anim-card">
+
+            <!-- Botón Central de Pánico SOS -->
+            <div class="clean-card p-6 text-center space-y-4 border-l-4 border-red-500">
+                <div>
+                    <span class="text-[10px] bg-red-100 text-red-700 font-extrabold uppercase px-2 py-0.5 rounded-full border border-red-200">Botón de Pánico Inmediato</span>
+                    <h2 class="text-base font-black text-slate-900 mt-1">Alarma Comunitaria de Emergencia</h2>
+                    <p class="text-xs text-slate-500 max-w-md mx-auto">Notifica a todos los vecinos con sonido de alarma indicando tu nombre, unidad y hora exacta.</p>
+                </div>
+
+                <div class="py-2 flex justify-center">
+                    <button onclick="triggerSOSPanic()" id="btnPanic" 
+                        class="sos-btn-pulse w-36 h-36 sm:w-40 sm:h-40 rounded-full bg-gradient-to-tr from-red-600 to-red-500 active:scale-95 text-white font-black text-2xl sm:text-3xl shadow-xl flex flex-col items-center justify-center gap-0.5 border-4 border-red-300 transition">
+                        <span class="text-3xl">🚨</span>
+                        <span>SOS</span>
+                        <span class="text-[9px] font-semibold tracking-wider uppercase opacity-95">Presionar</span>
+                    </button>
+                </div>
+
+                <div class="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 font-medium">
+                    <span>🛡️ Registrado conforme a la Ley N° 19.628 de Protección de Datos</span>
+                </div>
+            </div>
+
+            <!-- Centrales de Emergencia Oficiales de Chile (Discado de 1 Toque) -->
+            <div class="clean-card p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🇨🇱</span> Centrales de Emergencia (Discado Rápido de 1 Toque)
+                    </h3>
+                    <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold">Oficial</span>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                    <a href="tel:133" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 p-3 rounded-xl flex items-center justify-between active:scale-95 transition">
+                        <div>
+                            <p class="text-[10px] text-emerald-800 font-extrabold uppercase">Carabineros</p>
+                            <p class="text-base font-black text-emerald-900">133</p>
+                        </div>
+                        <span class="text-2xl">👮</span>
+                    </a>
+
+                    <a href="tel:132" class="bg-red-50 hover:bg-red-100 border border-red-200 p-3 rounded-xl flex items-center justify-between active:scale-95 transition">
+                        <div>
+                            <p class="text-[10px] text-red-800 font-extrabold uppercase">Bomberos</p>
+                            <p class="text-base font-black text-red-900">132</p>
+                        </div>
+                        <span class="text-2xl">🚒</span>
+                    </a>
+
+                    <a href="tel:131" class="bg-amber-50 hover:bg-amber-100 border border-amber-200 p-3 rounded-xl flex items-center justify-between active:scale-95 transition">
+                        <div>
+                            <p class="text-[10px] text-amber-800 font-extrabold uppercase">SAMU Ambulancia</p>
+                            <p class="text-base font-black text-amber-900">131</p>
+                        </div>
+                        <span class="text-2xl">🚑</span>
+                    </a>
+
+                    <a href="tel:134" class="bg-blue-50 hover:bg-blue-100 border border-blue-200 p-3 rounded-xl flex items-center justify-between active:scale-95 transition">
+                        <div>
+                            <p class="text-[10px] text-blue-800 font-extrabold uppercase">PDI Investigaciones</p>
+                            <p class="text-base font-black text-blue-900">134</p>
+                        </div>
+                        <span class="text-2xl">🔍</span>
+                    </a>
+
+                    <a id="btnMunicipalSecurity" href="tel:1444" class="bg-purple-50 hover:bg-purple-100 border border-purple-200 p-3 rounded-xl flex items-center justify-between active:scale-95 transition col-span-2 sm:col-span-2">
+                        <div>
+                            <p class="text-[10px] text-purple-800 font-extrabold uppercase" id="labelMunicipalCommune">Seguridad Municipal (Macul)</p>
+                            <p class="text-base font-black text-purple-900" id="valMunicipalPhone">1444</p>
+                        </div>
+                        <span class="text-2xl">🚔</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Alertas Activas en Tiempo Real -->
+            <div class="clean-card p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Alertas de Emergencia en el Condominio</h3>
+                    <button onclick="loadIncidents()" class="text-[11px] text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1">
+                        <span>🔄</span> Actualizar
+                    </button>
+                </div>
+                <div id="activeAlertsList" class="space-y-2"></div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA 2: MASTERPLAN Y PLANO CATASTRAL INTERACTIVO ================= -->
+        <section id="tabMap" class="hidden space-y-4 anim-card">
+            <div class="clean-card p-4 space-y-3 border-l-4 border-indigo-600">
+                <!-- Barra Superior de Control del Masterplan -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-2 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                            <span>🗺️</span> MASTERPLAN CATASTRAL INTERACTIVO (100% NATIVO)
+                        </h2>
+                        <p class="text-xs text-slate-500">Plano vectorial interactivo de alta precisión. Haz clic o toca en cualquier zona para marcar puntos, registrar incidencias o verificar cámaras y accesos sin APIs externas.</p>
+                    </div>
+                    
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <!-- Botón Modo Marcar Punto -->
+                        <button onclick="toggleMapMarkMode()" id="btnToggleMarkMode" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow transition">
+                            <span id="markModeIcon">🎯</span> <span id="markModeText">Modo Marcar: ACTIVO</span>
+                        </button>
+                        <!-- Botones Zoom & Reset -->
+                        <div class="flex rounded-xl bg-slate-100 p-0.5 text-xs font-bold border border-slate-200">
+                            <button onclick="zoomMasterplan(0.25)" class="px-2.5 py-1 rounded-lg text-slate-700 hover:bg-white hover:text-blue-600 transition" title="Acercar [+]">➕</button>
+                            <button onclick="zoomMasterplan(-0.25)" class="px-2.5 py-1 rounded-lg text-slate-700 hover:bg-white hover:text-blue-600 transition" title="Alejar [-]">➖</button>
+                            <button onclick="resetMasterplanView()" class="px-2.5 py-1 rounded-lg text-slate-700 hover:bg-white hover:text-blue-600 transition" title="Restablecer Vista">⟲ Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selector Rápido de Sectores del Condominio -->
+                <div class="flex items-center justify-between text-xs gap-2 pt-1">
+                    <span class="text-slate-500 font-medium text-[11px] whitespace-nowrap">Ir a sector:</span>
+                    <div class="flex gap-1 overflow-x-auto pb-1 text-[11px]">
+                        <button onclick="focusSector('ACCESO_PORTON', 500, 560, 1.4)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🚧 Portón & Acceso</button>
+                        <button onclick="focusSector('CASAS_1_10', 250, 250, 1.3)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🏡 Pasaje 1 (Casas 1-10)</button>
+                        <button onclick="focusSector('CASAS_11_20', 750, 250, 1.3)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🏡 Pasaje 2 (Casas 11-20)</button>
+                        <button onclick="focusSector('TORRE_A_B', 500, 110, 1.4)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🏢 Torres Deptos (A y B)</button>
+                        <button onclick="focusSector('PLAZA_JUEGOS', 250, 440, 1.4)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🎪 Plaza de Juegos</button>
+                        <button onclick="focusSector('QUINCHO', 670, 420, 1.5)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🍖 Quincho</button>
+                        <button onclick="focusSector('PISCINA', 840, 450, 1.5)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🏊 Piscina</button>
+                        <button onclick="focusSector('ESTACIONAMIENTO', 310, 535, 1.4)" class="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg whitespace-nowrap font-medium transition">🚗 Estac. Visitas</button>
+                    </div>
+                </div>
+
+                <!-- CONTENEDOR DEL MASTERPLAN VECTORIAL INTERACTIVO -->
+                <div class="relative rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner bg-slate-50">
+                    <div id="masterplanViewport">
+                        <div id="masterplanCanvas" style="width: 1000px; height: 620px;">
+                            <!-- SVG Arquitectónico Vectorial -->
+                            <svg id="masterplanSvg" viewBox="0 0 1000 620" class="w-full h-full block" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <pattern id="grassPattern" width="24" height="24" patternUnits="userSpaceOnUse">
+                                        <rect width="24" height="24" fill="#f0fdf4"/>
+                                        <circle cx="6" cy="6" r="1.5" fill="#dcfce7"/>
+                                        <circle cx="18" cy="18" r="1.5" fill="#dcfce7"/>
+                                    </pattern>
+                                </defs>
+
+                                <!-- Base Césped y Terreno -->
+                                <rect x="0" y="0" width="1000" height="620" fill="url(#grassPattern)" />
+
+                                <!-- Cerco Eléctrico y Muro Perimetral -->
+                                <rect x="25" y="25" width="950" height="570" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="3" stroke-dasharray="10 5" />
+                                <rect x="35" y="35" width="930" height="550" rx="12" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5" />
+
+                                <!-- Calzada Central y Vías Vehiculares -->
+                                <path d="M 455,595 L 455,510 L 545,510 L 545,595 Z" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2"/>
+                                <rect x="440" y="210" width="120" height="305" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5"/>
+                                <line x1="500" y1="220" x2="500" y2="505" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+
+                                <!-- Pasaje Poniente (Casas 1-10) -->
+                                <rect x="65" y="210" width="375" height="70" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5"/>
+                                <line x1="75" y1="245" x2="435" y2="245" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+
+                                <!-- Pasaje Oriente (Casas 11-20) -->
+                                <rect x="560" y="210" width="375" height="70" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5"/>
+                                <line x1="565" y1="245" x2="930" y2="245" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>
+
+                                <!-- Paso Cebra Peatonal -->
+                                <g stroke="#ffffff" stroke-width="3">
+                                    <line x1="465" y1="510" x2="465" y2="520"/>
+                                    <line x1="480" y1="510" x2="480" y2="520"/>
+                                    <line x1="495" y1="510" x2="495" y2="520"/>
+                                    <line x1="510" y1="510" x2="510" y2="520"/>
+                                    <line x1="525" y1="510" x2="525" y2="520"/>
+                                    <line x1="535" y1="510" x2="535" y2="520"/>
+                                </g>
+
+                                <!-- Portón Principal & Buzón -->
+                                <g id="sectorPorton" class="map-zone" cursor="pointer">
+                                    <rect x="450" y="535" width="100" height="48" rx="6" fill="#1e293b" />
+                                    <text x="500" y="556" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">🚧 PORTÓN ACCESO</text>
+                                    <text x="500" y="572" fill="#94a3b8" font-size="9" text-anchor="middle">TAG • Citófono</text>
+                                    <rect x="555" y="535" width="45" height="48" rx="4" fill="#3b82f6" />
+                                    <text x="577" y="556" fill="#ffffff" font-size="13" text-anchor="middle">📦</text>
+                                    <text x="577" y="572" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">BUZÓN</text>
+                                </g>
+
+                                <!-- Estacionamientos de Visitas -->
+                                <g id="sectorParking" class="map-zone" cursor="pointer">
+                                    <rect x="180" y="505" width="245" height="65" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+                                    <text x="302" y="525" fill="#475569" font-size="11" font-weight="bold" text-anchor="middle">🚗 ESTACIONAMIENTOS VISITAS (P1 - P6)</text>
+                                    <line x1="220" y1="535" x2="220" y2="565" stroke="#cbd5e1" stroke-width="1.5"/>
+                                    <line x1="260" y1="535" x2="260" y2="565" stroke="#cbd5e1" stroke-width="1.5"/>
+                                    <line x1="300" y1="535" x2="300" y2="565" stroke="#cbd5e1" stroke-width="1.5"/>
+                                    <line x1="340" y1="535" x2="340" y2="565" stroke="#cbd5e1" stroke-width="1.5"/>
+                                    <line x1="380" y1="535" x2="380" y2="565" stroke="#cbd5e1" stroke-width="1.5"/>
+                                    <text x="200" y="552" fill="#64748b" font-size="9" text-anchor="middle">P1</text>
+                                    <text x="240" y="552" fill="#64748b" font-size="9" text-anchor="middle">P2</text>
+                                    <text x="280" y="552" fill="#64748b" font-size="9" text-anchor="middle">P3</text>
+                                    <text x="320" y="552" fill="#64748b" font-size="9" text-anchor="middle">P4</text>
+                                    <text x="360" y="552" fill="#64748b" font-size="9" text-anchor="middle">P5</text>
+                                    <text x="400" y="552" fill="#64748b" font-size="9" text-anchor="middle">P6</text>
+                                </g>
+
+                                <!-- Casas Manzana Poniente (Casas 1 a 10) -->
+                                <g id="casasPoniente">
+                                    <!-- Casa 1 -->
+                                    <g class="map-zone"><rect x="65" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="70" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="99" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 1</text><circle cx="99" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <!-- Casa 2 -->
+                                    <g class="map-zone"><rect x="142" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="147" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="176" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 2</text><circle cx="176" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <!-- Casa 3 -->
+                                    <g class="map-zone"><rect x="219" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="224" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="253" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 3</text><circle cx="253" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <!-- Casa 4 -->
+                                    <g class="map-zone"><rect x="296" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="301" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="330" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 4</text><circle cx="330" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <!-- Casa 5 -->
+                                    <g class="map-zone"><rect x="373" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="378" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="407" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 5</text><circle cx="407" cy="182" r="4" fill="#60a5fa"/></g>
+
+                                    <!-- Fila Sur (Casas 6 a 10) -->
+                                    <g class="map-zone"><rect x="65" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="70" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="99" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 6</text><circle cx="99" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="142" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="147" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="176" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 7</text><circle cx="176" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="219" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="224" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="253" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 8</text><circle cx="253" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="296" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="301" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="330" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 9</text><circle cx="330" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="373" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="378" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="407" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 10</text><circle cx="407" cy="310" r="4" fill="#60a5fa"/></g>
+                                </g>
+
+                                <!-- Casas Manzana Oriente (Casas 11 a 20) -->
+                                <g id="casasOriente">
+                                    <g class="map-zone"><rect x="560" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="565" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="594" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 11</text><circle cx="594" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="637" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="642" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="671" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 12</text><circle cx="671" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="714" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="719" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="748" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 13</text><circle cx="748" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="791" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="796" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="825" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 14</text><circle cx="825" cy="182" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="868" y="125" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="873" y="130" width="58" height="38" rx="4" fill="#dbeafe"/><text x="902" y="155" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 15</text><circle cx="902" cy="182" r="4" fill="#60a5fa"/></g>
+
+                                    <!-- Fila Sur (Casas 16 a 20) -->
+                                    <g class="map-zone"><rect x="560" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="565" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="594" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 16</text><circle cx="594" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="637" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="642" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="671" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 17</text><circle cx="671" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="714" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="719" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="748" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 18</text><circle cx="748" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="791" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="796" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="825" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 19</text><circle cx="825" cy="310" r="4" fill="#60a5fa"/></g>
+                                    <g class="map-zone"><rect x="868" y="295" width="68" height="75" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5"/><rect x="873" y="327" width="58" height="38" rx="4" fill="#dbeafe"/><text x="902" y="352" fill="#1e40af" font-size="11" font-weight="black" text-anchor="middle">CASA 20</text><circle cx="902" cy="310" r="4" fill="#60a5fa"/></g>
+                                </g>
+
+                                <!-- Torres Departamentos A y B -->
+                                <g id="sectorEdificios" class="map-zone" cursor="pointer">
+                                    <rect x="360" y="45" width="130" height="75" rx="8" fill="#ffffff" stroke="#6366f1" stroke-width="2"/>
+                                    <rect x="370" y="52" width="110" height="25" rx="4" fill="#e0e7ff"/>
+                                    <text x="425" y="69" fill="#4338ca" font-size="11" font-weight="black" text-anchor="middle">🏢 TORRE A (Deptos)</text>
+                                    <text x="425" y="100" fill="#64748b" font-size="9" text-anchor="middle">Pisos 1 - 4 • Acceso</text>
+
+                                    <rect x="510" y="45" width="130" height="75" rx="8" fill="#ffffff" stroke="#6366f1" stroke-width="2"/>
+                                    <rect x="520" y="52" width="110" height="25" rx="4" fill="#e0e7ff"/>
+                                    <text x="575" y="69" fill="#4338ca" font-size="11" font-weight="black" text-anchor="middle">🏢 TORRE B (Deptos)</text>
+                                    <text x="575" y="100" fill="#64748b" font-size="9" text-anchor="middle">Pisos 1 - 4 • Salón</text>
+                                </g>
+
+                                <!-- Plaza de Juegos -->
+                                <g id="sectorPlaza" class="map-zone" cursor="pointer">
+                                    <rect x="150" y="390" width="200" height="85" rx="12" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+                                    <text x="250" y="415" fill="#15803d" font-size="11" font-weight="black" text-anchor="middle">🎪 PLAZA DE JUEGOS</text>
+                                    <text x="250" y="435" fill="#16a34a" font-size="9" text-anchor="middle">Columpios • Resbalín • Bancos</text>
+                                    <text x="250" y="460" fill="#166534" font-size="14" text-anchor="middle">🌳 🎠 🧸 🌳</text>
+                                </g>
+
+                                <!-- Quincho Techado -->
+                                <g id="sectorQuincho" class="map-zone" cursor="pointer">
+                                    <rect x="590" y="390" width="160" height="65" rx="10" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+                                    <text x="670" y="415" fill="#b45309" font-size="11" font-weight="black" text-anchor="middle">🍖 QUINCHO TECHADO</text>
+                                    <text x="670" y="435" fill="#92400e" font-size="9" text-anchor="middle">Parrillas • Mesas Comunitarias</text>
+                                </g>
+
+                                <!-- Piscina Comunitaria -->
+                                <g id="sectorPiscina" class="map-zone" cursor="pointer">
+                                    <rect x="770" y="390" width="150" height="105" rx="10" fill="#ffffff" stroke="#0284c7" stroke-width="1.5"/>
+                                    <rect x="785" y="410" width="120" height="70" rx="8" fill="#38bdf8" stroke="#0ea5e9" stroke-width="2"/>
+                                    <text x="845" y="440" fill="#ffffff" font-size="14" text-anchor="middle">🏊</text>
+                                    <text x="845" y="458" fill="#0369a1" font-size="10" font-weight="black" text-anchor="middle">PISCINA</text>
+                                    <text x="845" y="488" fill="#0284c7" font-size="8" text-anchor="middle">Cercado de Seguridad</text>
+                                </g>
+
+                                <!-- Red de Postes de Foco LED -->
+                                <g id="luminariasRed" opacity="0.85">
+                                    <g transform="translate(100, 205)"><circle cx="0" cy="0" r="5" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-8" font-size="9" text-anchor="middle">💡</text></g>
+                                    <g transform="translate(255, 205)"><circle cx="0" cy="0" r="5" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-8" font-size="9" text-anchor="middle">💡</text></g>
+                                    <g transform="translate(410, 205)"><circle cx="0" cy="0" r="5" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-8" font-size="9" text-anchor="middle">💡</text></g>
+                                    <g transform="translate(590, 205)"><circle cx="0" cy="0" r="5" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-8" font-size="9" text-anchor="middle">💡</text></g>
+                                    <g transform="translate(750, 205)"><circle cx="0" cy="0" r="5" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-8" font-size="9" text-anchor="middle">💡</text></g>
+                                    <g transform="translate(900, 205)"><circle cx="0" cy="0" r="5" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-8" font-size="9" text-anchor="middle">💡</text></g>
+                                    <g transform="translate(500, 490)"><circle cx="0" cy="0" r="6" fill="#facc15" stroke="#ca8a04"/><text x="0" y="-9" font-size="10" text-anchor="middle">💡</text></g>
+                                </g>
+
+                                <!-- Cámaras de Seguridad -->
+                                <g id="camarasRed">
+                                    <g transform="translate(440, 545)"><circle cx="0" cy="0" r="6" fill="#4338ca"/><text x="0" y="-8" font-size="9" text-anchor="middle">📹</text></g>
+                                    <g transform="translate(560, 545)"><circle cx="0" cy="0" r="6" fill="#4338ca"/><text x="0" y="-8" font-size="9" text-anchor="middle">📹</text></g>
+                                    <g transform="translate(50, 45)"><circle cx="0" cy="0" r="6" fill="#4338ca"/><text x="0" y="-8" font-size="9" text-anchor="middle">📹</text></g>
+                                    <g transform="translate(950, 45)"><circle cx="0" cy="0" r="6" fill="#4338ca"/><text x="0" y="-8" font-size="9" text-anchor="middle">📹</text></g>
+                                    <g transform="translate(500, 45)"><circle cx="0" cy="0" r="6" fill="#4338ca"/><text x="0" y="-8" font-size="9" text-anchor="middle">📹</text></g>
+                                </g>
+
+                                <!-- Norte -->
+                                <g transform="translate(930, 75)">
+                                    <circle cx="0" cy="0" r="14" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+                                    <path d="M 0,-12 L 4,-2 L -4,-2 Z" fill="#ef4444"/>
+                                    <path d="M 0,12 L 4,2 L -4,2 Z" fill="#64748b"/>
+                                    <text x="0" y="-14" fill="#ef4444" font-size="9" font-weight="black" text-anchor="middle">N</text>
+                                </g>
+                            </svg>
+
+                            <!-- Capa Absoluta para Marcadores y Pines Interactivos -->
+                            <div id="masterplanPinsLayer" class="absolute inset-0 pointer-events-none"></div>
+                        </div>
+
+                        <!-- Badge Indicador de Clic para Marcar -->
+                        <div id="mapInstructionBanner" class="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-slate-900/85 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-none flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span>Haz clic o toca en cualquier punto para marcar</span>
+                        </div>
+
+                        <!-- Indicador flotante de Coordenadas y Sector -->
+                        <div id="mapCoordinatesFloat" class="absolute bottom-2 left-2 z-30 bg-white/90 backdrop-blur-md border border-slate-200 text-slate-700 text-[10px] font-mono px-2.5 py-1 rounded-lg shadow-sm pointer-events-none">
+                            Sector: Centro Condominio | -33.48580, -70.59860
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FORMULARIO DE CREACIÓN DE PUNTO MARCADO (Se activa al hacer clic en el mapa) -->
+                <div id="pointCreationCard" class="hidden p-4 rounded-xl bg-blue-50 border-2 border-blue-300 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">📍</span>
+                            <div>
+                                <h4 class="text-xs font-black text-blue-950 uppercase">Punto Marcado en el Mapa</h4>
+                                <p class="text-[11px] text-blue-700 font-mono" id="pointCoordinatesDisplay">Lat: -33.00000 | Lng: -70.00000</p>
+                            </div>
+                        </div>
+                        <button onclick="cancelPointCreation()" class="text-slate-400 hover:text-slate-700 font-bold text-sm px-2 py-1">✕</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Título o Nombre del Punto *</label>
+                            <input type="text" id="newPointTitle" placeholder="Ej: Portón sin cerrojo / Luz apagada / Auto sospechoso" class="w-full p-2 border border-blue-200 rounded-lg bg-white text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Categoría del Marcador</label>
+                            <select id="newPointCategory" class="w-full p-2 border border-blue-200 rounded-lg bg-white text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="INTEREST">📌 Punto de Referencia / Interés</option>
+                                <option value="LIGHTING">💡 Oportunidad Luminaria / Foco LED</option>
+                                <option value="CAMERA">📹 Punto Ciego / Necesidad de Cámara IP</option>
+                                <option value="SUSPICIOUS">⚠️ Sospecha / Merodeo</option>
+                                <option value="SOS">🚨 Emergencia Crítica / SOS</option>
+                                <option value="PACKAGE">📦 Encomienda</option>
+                                <option value="PET">🐾 Mascota Avistada</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Notas u Observación (Opcional)</label>
+                        <input type="text" id="newPointNotes" placeholder="Detalle adicional visible para los vecinos..." class="w-full p-2 border border-blue-200 rounded-lg bg-white text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1 flex-wrap gap-2">
+                        <button onclick="createIncidentFromSelectedPoint()" class="text-xs bg-red-600 hover:bg-red-700 text-white font-black px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow">
+                            <span>🚨</span> Difundir como Alerta Oficial
+                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="cancelPointCreation()" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-2 rounded-xl transition">
+                                Cancelar
+                            </button>
+                            <button onclick="saveUserMarkedPoint()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-xl transition shadow">
+                                💾 Guardar Punto en Mapa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LISTADO DE PUNTOS MARCADOS EN EL MAPA -->
+                <div class="space-y-2 pt-2">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📍</span> PUNTOS E INCIDENCIAS EN EL MAPA (<span id="countMarkedPoints">0</span>)
+                        </h3>
+                        <button onclick="loadMapPoints()" class="text-[11px] text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1">
+                            <span>🔄</span> Recargar Puntos
+                        </button>
+                    </div>
+                    <div id="markedPointsListContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA 3: COMUNIDAD (ENCOMIENDAS, MASCOTAS, APOYO, QUINCHO) ================= -->
+        <section id="tabCommunity" class="hidden space-y-4 anim-card">
+
+            <!-- Sub-pestañas comunitarias -->
+            <div class="grid grid-cols-4 gap-1 p-1 bg-slate-200 rounded-xl text-xs text-center font-bold">
+                <button onclick="switchCommunitySub('subPackages')" id="subBtnPackages" class="py-1.5 rounded-lg bg-white text-blue-600 shadow-sm transition">📦 Encomiendas</button>
+                <button onclick="switchCommunitySub('subPets')" id="subBtnPets" class="py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">🐾 Mascotas</button>
+                <button onclick="switchCommunitySub('subSupport')" id="subBtnSupport" class="py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">🤝 Apoyo</button>
+                <button onclick="switchCommunitySub('subAmenities')" id="subBtnAmenities" class="py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">🏊 Áreas</button>
+            </div>
+
+            <!-- SUB-TAB 1: ENCOMIENDAS -->
+            <div id="subPackages" class="space-y-3">
+                <div class="clean-card p-4 flex items-center justify-between border-l-4 border-amber-500">
+                    <div>
+                        <h3 class="text-xs font-black text-slate-900 uppercase">Recepción Solidaria de Encomiendas</h3>
+                        <p class="text-[11px] text-slate-500">¿Recibiste un paquete de Chilexpress o MercadoLibre para un vecino ausente? Regístralo aquí.</p>
+                    </div>
+                    <button onclick="openPackageModal()" class="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3 py-2 rounded-xl transition shadow">
+                        + Registrar Paquete
+                    </button>
+                </div>
+                <div id="packagesListContainer" class="space-y-2"></div>
+            </div>
+
+            <!-- SUB-TAB 2: MASCOTAS -->
+            <div id="subPets" class="hidden space-y-3">
+                <div class="clean-card p-4 flex items-center justify-between border-l-4 border-emerald-500">
+                    <div>
+                        <h3 class="text-xs font-black text-slate-900 uppercase">Mascotas Extraviadas y Encontradas</h3>
+                        <p class="text-[11px] text-slate-500">Publica avisos con foto para encontrar rápidamente a mascotas del condominio.</p>
+                    </div>
+                    <button onclick="openPetModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3 py-2 rounded-xl transition shadow">
+                        + Publicar Mascota
+                    </button>
+                </div>
+                <div id="petsListContainer" class="space-y-2"></div>
+            </div>
+
+            <!-- SUB-TAB 3: RED DE APOYO Y SALUD -->
+            <div id="subSupport" class="hidden space-y-3">
+                <div class="clean-card p-4 flex items-center justify-between border-l-4 border-purple-500">
+                    <div>
+                        <h3 class="text-xs font-black text-slate-900 uppercase">Red Solidaria y Adultos Mayores</h3>
+                        <p class="text-[11px] text-slate-500">Ofrece o solicita asistencia vecinal (compra de medicamentos, transporte médico, cortes de luz).</p>
+                    </div>
+                    <button onclick="openSupportModal()" class="bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs px-3 py-2 rounded-xl transition shadow">
+                        + Pedir / Ofrecer Ayuda
+                    </button>
+                </div>
+                <div id="supportListContainer" class="space-y-2"></div>
+            </div>
+
+            <!-- SUB-TAB 4: ESPACIOS COMUNES (QUINCHO, PISCINA, GYM) -->
+            <div id="subAmenities" class="hidden space-y-3">
+                <div class="clean-card p-4 space-y-3 border-l-4 border-blue-500">
+                    <h3 class="text-xs font-black text-slate-900 uppercase">Estado de Espacios Comunes (Sin Conserje)</h3>
+                    <p class="text-[11px] text-slate-500">Supervisa en tiempo real si el quincho, piscina o gimnasio están disponibles o en mantención.</p>
+                    <div id="amenitiesListContainer" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA 4: MOTOR PREDICTIVO & OPORTUNIDADES DE MEJORA ================= -->
+        <section id="tabPredictive" class="hidden space-y-4 anim-card">
+            <div class="clean-card p-4 space-y-3 border-l-4 border-emerald-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                            <span>💡</span> DIAGNÓSTICO PREDICTIVO & MEJORAS
+                        </h2>
+                        <p class="text-xs text-slate-500">Análisis inteligente según zonas de reportes para priorizar inversiones de seguridad.</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-slate-400 block font-semibold">Índice de Seguridad</span>
+                        <span class="text-base font-black text-emerald-600" id="statSecurityScore">82 / 100</span>
+                    </div>
+                </div>
+
+                <!-- Oportunidades Detectadas Automáticamente -->
+                <div id="predictiveOpportunitiesList" class="space-y-3 pt-2"></div>
+            </div>
+
+            <!-- Formulario para Reportar Incidente con Subida de Foto -->
+            <div class="clean-card p-4 space-y-3 border-l-4 border-yellow-500">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-900 uppercase">¿Presenciaste una anomalía en el condominio?</h3>
+                    <button onclick="openReportModal()" class="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-extrabold text-xs px-3 py-2 rounded-xl transition shadow">
+                        📸 Reportar con Foto
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-500">Informa sobre vehículos desconocidos, personas merodeando o luminarias apagadas para alimentar el motor predictivo.</p>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA 5: PANEL DE GESTIÓN (SUB-ADMIN & SUPERADMIN) ================= -->
+        <section id="tabAdmin" class="hidden space-y-4 anim-card">
+            <!-- Panel SubAdmin (Representante) -->
+            <div id="panelSubadminSection" class="clean-card p-4 space-y-3 border-l-4 border-blue-600">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>👑</span> Control de Residentes (Representante Vecinal)
+                    </h3>
+                    <span class="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-2 py-0.5 rounded">Filtro Anti-Infiltrados</span>
+                </div>
+                <div id="residentsListTable" class="space-y-2"></div>
+
+                <!-- Publicar Comunicado Oficial -->
+                <div class="pt-3 border-t border-slate-100 space-y-2">
+                    <h4 class="text-xs font-bold text-slate-800 uppercase">Emitir Comunicado Oficial</h4>
+                    <input type="text" id="annTitle" placeholder="Título (ej: Mantención de portón eléctrico)" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-500">
+                    <textarea id="annContent" rows="2" placeholder="Mensaje oficial para todos los vecinos..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-500"></textarea>
+                    <button onclick="submitAnnouncement()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 rounded-xl transition shadow">
+                        Difundir Comunicado
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel SuperAdmin (Mantenedor) -->
+            <div id="panelSuperadminSection" class="clean-card p-4 space-y-3 border-l-4 border-purple-600 hidden">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-purple-900 uppercase tracking-wider">Mantenimiento de Plataforma (SuperAdmin)</h3>
+                    <a href="/api/admin/backup-db" target="_blank" class="text-[11px] bg-purple-100 text-purple-800 hover:bg-purple-200 px-2.5 py-1 rounded-lg font-bold transition">
+                        💾 Descargar Respaldo SQLite
+                    </a>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                        <p class="text-[10px] text-slate-400">Condominios</p>
+                        <p class="text-base font-black text-slate-900" id="statCondosCount">1</p>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                        <p class="text-[10px] text-slate-400">Protección Legal</p>
+                        <p class="text-base font-black text-emerald-600">Ley 19.628</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================= MODAL REPORTAR INCIDENTE CON FOTO ================= -->
+    <div id="reportModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white max-w-md w-full p-5 rounded-2xl shadow-2xl border border-slate-200 space-y-3 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 class="text-sm font-extrabold text-slate-900 uppercase">Reportar Incidente con Imagen</h3>
+                <button onclick="closeReportModal()" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-700 block mb-1">Sector o Zona:</label>
+                        <select id="reportZone" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 font-medium">
+                            <option value="ACCESO_PORTON">🚪 Acceso Principal y Portón</option>
+                            <option value="JUEGOS_NINOS">🛝 Plaza de Juegos Infantiles</option>
+                            <option value="ESTACIONAMIENTOS">🚗 Estacionamientos</option>
+                            <option value="QUINCHO_PISCINA">🥩 Quincho / Piscina</option>
+                            <option value="PASAJE_1">🏡 Pasaje 1 (Sector Norte)</option>
+                            <option value="PASAJE_2">🏡 Pasaje 2 (Puntos Ciegos)</option>
+                            <option value="MAPA_GPS">📍 Punto GPS Marcado en Mapa</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-700 block mb-1">Coordenadas GPS (Opcional):</label>
+                        <input type="text" id="reportCoordsDisplay" readonly placeholder="Marcado en mapa o GPS" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2 text-slate-600 font-mono text-[11px]">
+                        <input type="hidden" id="reportLat">
+                        <input type="hidden" id="reportLng">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">Categoría del Incidente:</label>
+                    <select id="reportCategory" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 font-medium">
+                        <option value="SUSPICIOUS_PERSON">👤 Persona sospechosa merodeando</option>
+                        <option value="STRANGE_VEHICLE">🚗 Vehículo desconocido estacionado</option>
+                        <option value="GATE_OPEN">🚪 Portón o acceso abierto / Falla de cierre</option>
+                        <option value="NOISE">🔊 Ruidos molestos excesivos</option>
+                        <option value="GENERAL">⚠️ Situación anómala general</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">Título:</label>
+                    <input type="text" id="reportTitle" placeholder="Ej: Sujeto en bicicleta mirando casas en pasaje 2" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">Descripción:</label>
+                    <textarea id="reportDesc" rows="3" placeholder="Indica detalles, vestimenta o vestigios..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900"></textarea>
+                </div>
+                
+                <!-- Carga de Imagen Comprimida en Canvas -->
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">📸 Adjuntar Foto (Opcional):</label>
+                    <input type="file" id="reportImageInput" accept="image/*" onchange="handleImageCompress(event, 'reportPreview', 'reportBase64')" 
+                        class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                    <input type="hidden" id="reportBase64">
+                    <div id="reportPreview" class="mt-2 hidden">
+                        <img src="" class="max-h-36 rounded-xl border border-slate-200 mx-auto shadow-sm">
+                    </div>
+                </div>
+
+                <button onclick="submitReportWithImage()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-2.5 rounded-xl transition shadow">
+                    Publicar Reporte en el Muro y Mapa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL ENCOMIENDA ================= -->
+    <div id="packageModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white max-w-md w-full p-5 rounded-2xl shadow-2xl border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 class="text-sm font-extrabold text-slate-900 uppercase">Registrar Paquete Recibido</h3>
+                <button onclick="closePackageModal()" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">¿Para qué casa/depto es el paquete?</label>
+                    <input type="text" id="pkgTargetUnit" placeholder="Ej: Casa 12 / Depto 402" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">Empresa de Envío:</label>
+                    <input type="text" id="pkgCarrier" placeholder="Chilexpress, MercadoLibre, BlueExpress..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-1">📸 Foto de la encomienda / etiqueta:</label>
+                    <input type="file" id="pkgImageInput" accept="image/*" onchange="handleImageCompress(event, 'pkgPreview', 'pkgBase64')" class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700">
+                    <input type="hidden" id="pkgBase64">
+                    <div id="pkgPreview" class="mt-2 hidden">
+                        <img src="" class="max-h-32 rounded-xl border border-slate-200 mx-auto">
+                    </div>
+                </div>
+                <button onclick="submitPackage()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs py-2.5 rounded-xl transition shadow">
+                    Notificar a la Comunidad
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Login / Demo -->
+    <div id="authModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white max-w-md w-full p-5 rounded-2xl shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 class="text-sm font-bold text-slate-900 uppercase">Cambiar Perfil Demo (1 Clic)</h3>
+                <button onclick="toggleAuthModal()" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <button onclick="quickLogin('vecino1@aromos.cl', 'vecino123')" class="w-full text-left bg-slate-50 hover:bg-slate-100 p-2.5 rounded-xl border border-slate-200 flex justify-between items-center transition">
+                    <div>
+                        <p class="font-bold text-slate-900">Juan Pérez</p>
+                        <p class="text-[11px] text-slate-500">Casa 1 • Residente</p>
+                    </div>
+                    <span class="text-xs bg-slate-200 px-2 py-0.5 rounded font-bold">Vecino</span>
+                </button>
+                <button onclick="quickLogin('representante@aromos.cl', 'representante123')" class="w-full text-left bg-blue-50 hover:bg-blue-100 p-2.5 rounded-xl border border-blue-200 flex justify-between items-center transition">
+                    <div>
+                        <p class="font-bold text-blue-900">Patricia Morales</p>
+                        <p class="text-[11px] text-blue-600">Casa 7 • Representante Vecinal</p>
+                    </div>
+                    <span class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold">Sub-Admin</span>
+                </button>
+                <button onclick="quickLogin('admin@condoseguro.cl', 'admin123456')" class="w-full text-left bg-purple-50 hover:bg-purple-100 p-2.5 rounded-xl border border-purple-200 flex justify-between items-center transition">
+                    <div>
+                        <p class="font-bold text-purple-900">Administrador General</p>
+                        <p class="text-[11px] text-purple-600">Soporte Técnico & Mantenedor</p>
+                    </div>
+                    <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded font-bold">SuperAdmin</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Estado y Lógica -->
+    <script>
+        let CURRENT_USER = null;
+        let AUTH_TOKEN = localStorage.getItem('condo_token') || null;
+
+        function showAlert(msg, type = 'info') {
+            const banner = document.getElementById('alertBanner');
+            const inner = document.getElementById('alertBannerInner');
+            const msgEl = document.getElementById('alertBannerMsg');
+            if (!banner || !inner || !msgEl) return;
+
+            banner.classList.remove('hidden');
+            msgEl.innerHTML = msg;
+            if (type === 'error') {
+                inner.className = 'text-xs p-3 rounded-xl border bg-red-50 border-red-200 text-red-800 flex items-center justify-between shadow-md';
+            } else if (type === 'success') {
+                inner.className = 'text-xs p-3 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-800 flex items-center justify-between shadow-md';
+            } else {
+                inner.className = 'text-xs p-3 rounded-xl border bg-blue-50 border-blue-200 text-blue-800 flex items-center justify-between shadow-md';
+            }
+
+            // Animación de entrada GSAP
+            gsap.fromTo(banner, { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.35 });
+            setTimeout(() => banner.classList.add('hidden'), 5000);
+        }
+
+        function switchTab(tabId) {
+            const tabs = ['tabSOS', 'tabMap', 'tabCommunity', 'tabPredictive', 'tabAdmin'];
+            const btns = ['tabBtnSOS', 'tabBtnMap', 'tabBtnCommunity', 'tabBtnPredictive', 'tabBtnAdmin'];
+
+            tabs.forEach((t, i) => {
+                const el = document.getElementById(t);
+                const btn = document.getElementById(btns[i]);
+                if (!el || !btn) return;
+                if (t === tabId) {
+                    el.classList.remove('hidden');
+                    btn.className = 'nav-tab active py-2 rounded-lg transition';
+                    gsap.fromTo(el, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" });
+                } else {
+                    el.classList.add('hidden');
+                    btn.className = 'nav-tab py-2 rounded-lg text-slate-600 hover:text-slate-900 transition';
+                }
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (tabId === 'tabMap') {
+                setTimeout(() => {
+                    initMasterplanMap();
+                    loadMapPoints();
+                }, 100);
+            }
+        }
+
+        function switchCommunitySub(subId) {
+            const subs = ['subPackages', 'subPets', 'subSupport', 'subAmenities'];
+            const btns = ['subBtnPackages', 'subBtnPets', 'subBtnSupport', 'subBtnAmenities'];
+            subs.forEach((s, i) => {
+                const el = document.getElementById(s);
+                const btn = document.getElementById(btns[i]);
+                if (s === subId) {
+                    el.classList.remove('hidden');
+                    btn.className = 'py-1.5 rounded-lg bg-white text-blue-600 shadow-sm transition';
+                    gsap.fromTo(el, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.25 });
+                } else {
+                    el.classList.add('hidden');
+                    btn.className = 'py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+                }
+            });
+        }
+
+        // Compresor de Imágenes en Cliente usando Canvas (Garantiza seguridad de memoria)
+        function handleImageCompress(event, previewId, hiddenInputId) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 800;
+
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Calidad JPEG balanceada (< 120 KB)
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                    document.getElementById(hiddenInputId).value = compressedBase64;
+                    const prev = document.getElementById(previewId);
+                    prev.querySelector('img').src = compressedBase64;
+                    prev.classList.remove('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            options.headers = options.headers || {};
+            if (AUTH_TOKEN) options.headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
+            if (options.body && typeof options.body === 'object') {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(options.body);
+            }
+            try {
+                const r = await fetch(endpoint, options);
+                if (r.status === 401) { logout(); return null; }
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.detail || 'Error en la petición');
+                return data;
+            } catch (err) {
+                showAlert(`⚠️ ${err.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function initApp() {
+            if (AUTH_TOKEN) {
+                const me = await apiFetch('/api/auth/me');
+                if (me) setCurrentUser(me);
+                else autoLoginDemo();
+            } else {
+                autoLoginDemo();
+            }
+        }
+
+        function autoLoginDemo() {
+            quickLogin('vecino1@aromos.cl', 'vecino123');
+        }
+
+        function setCurrentUser(user) {
+            CURRENT_USER = user;
+            document.getElementById('headerCondoName').textContent = user.condo_name || 'Condominio';
+            document.getElementById('headerUserName').textContent = user.full_name;
+            document.getElementById('headerUserUnit').textContent = user.house_unit;
+            document.getElementById('userBadge').classList.remove('hidden');
+            document.getElementById('btnAuthAction').textContent = 'Perfil';
+
+            const adminTab = document.getElementById('tabBtnAdmin');
+            if (user.role === 'SUBADMIN' || user.role === 'SUPERADMIN') {
+                adminTab.classList.remove('hidden');
+            } else {
+                adminTab.classList.add('hidden');
+            }
+
+            if (user.role === 'SUPERADMIN') {
+                document.getElementById('panelSuperadminSection').classList.remove('hidden');
+            }
+
+            loadIncidents();
+            loadPredictive();
+            loadPackages();
+            loadPets();
+            loadSupport();
+            loadAmenities();
+            loadMapPoints();
+            if (user.role === 'SUBADMIN' || user.role === 'SUPERADMIN') loadResidents();
+        }
+
+        async function quickLogin(email, password) {
+            toggleAuthModal(false);
+            const res = await apiFetch('/api/auth/login', {
+                method: 'POST',
+                body: { email, password }
+            });
+            if (res && res.token) {
+                AUTH_TOKEN = res.token;
+                localStorage.setItem('condo_token', AUTH_TOKEN);
+                setCurrentUser(res.user);
+                showAlert(`👋 Sesión iniciada: <b>${res.user.full_name}</b>`, 'success');
+            }
+        }
+
+        function toggleAuthModal(show = true) {
+            document.getElementById('authModal').classList.toggle('hidden', !show);
+        }
+
+        // ================= MASTERPLAN VECTORIAL CATASTRAL (100% NATIVO SIN LEAFLET) =================
+        let masterplanZoom = 1;
+        let masterplanPanX = 0;
+        let masterplanPanY = 0;
+        let isMasterplanDragging = false;
+        let masterplanDragStartX = 0;
+        let masterplanDragStartY = 0;
+        let masterplanHasMoved = false;
+        let MAP_MARK_MODE = true;
+        let CURRENT_SELECTED_POINT = null;
+        let CACHED_MAP_POINTS = [];
+        let CACHED_INCIDENTS_FOR_MAP = [];
+        let masterplanInitialized = false;
+
+        function initMasterplanMap() {
+            const viewport = document.getElementById('masterplanViewport');
+            const canvas = document.getElementById('masterplanCanvas');
+            if (!viewport || !canvas) return;
+
+            if (masterplanInitialized) {
+                renderMasterplanPins();
+                return;
+            }
+            masterplanInitialized = true;
+
+            // Centrar vista inicial con base en tamaño del viewport
+            resetMasterplanView();
+
+            // Eventos de Puntero / Touch para Pan
+            viewport.addEventListener('mousedown', (e) => onMasterplanPointerDown(e.clientX, e.clientY));
+            window.addEventListener('mousemove', (e) => onMasterplanPointerMove(e.clientX, e.clientY));
+            window.addEventListener('mouseup', () => onMasterplanPointerUp());
+
+            viewport.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    onMasterplanPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: false });
+
+            window.addEventListener('touchmove', (e) => {
+                if (isMasterplanDragging && e.touches.length === 1) {
+                    e.preventDefault();
+                    onMasterplanPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: false });
+
+            window.addEventListener('touchend', () => onMasterplanPointerUp());
+
+            // Zoom con rueda del mouse
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.15 : -0.15;
+                zoomMasterplan(delta);
+            }, { passive: false });
+
+            // Clic en el Viewport para Marcar Punto
+            viewport.addEventListener('click', (e) => {
+                if (masterplanHasMoved) return; // Si arrastró el mapa, no marcar
+                if (!MAP_MARK_MODE) return;
+                onMasterplanCanvasClick(e);
+            });
+
+            loadMapPoints();
+        }
+
+        function updateMasterplanTransform() {
+            const canvas = document.getElementById('masterplanCanvas');
+            if (!canvas) return;
+            canvas.style.transform = `translate(${masterplanPanX}px, ${masterplanPanY}px) scale(${masterplanZoom})`;
+        }
+
+        function onMasterplanPointerDown(clientX, clientY) {
+            isMasterplanDragging = true;
+            masterplanHasMoved = false;
+            masterplanDragStartX = clientX - masterplanPanX;
+            masterplanDragStartY = clientY - masterplanPanY;
+            const viewport = document.getElementById('masterplanViewport');
+            if (viewport) viewport.style.cursor = 'grabbing';
+        }
+
+        function onMasterplanPointerMove(clientX, clientY) {
+            if (!isMasterplanDragging) return;
+            const newPanX = clientX - masterplanDragStartX;
+            const newPanY = clientY - masterplanDragStartY;
+            if (Math.abs(newPanX - masterplanPanX) > 4 || Math.abs(newPanY - masterplanPanY) > 4) {
+                masterplanHasMoved = true;
+            }
+            masterplanPanX = newPanX;
+            masterplanPanY = newPanY;
+            updateMasterplanTransform();
+        }
+
+        function onMasterplanPointerUp() {
+            isMasterplanDragging = false;
+            const viewport = document.getElementById('masterplanViewport');
+            if (viewport) viewport.style.cursor = MAP_MARK_MODE ? 'crosshair' : 'grab';
+        }
+
+        function zoomMasterplan(factor) {
+            const prevZoom = masterplanZoom;
+            masterplanZoom = Math.min(3.0, Math.max(0.6, masterplanZoom + factor));
+            
+            // Zoom hacia el centro del viewport
+            const viewport = document.getElementById('masterplanViewport');
+            if (viewport) {
+                const rect = viewport.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                masterplanPanX = centerX - (centerX - masterplanPanX) * (masterplanZoom / prevZoom);
+                masterplanPanY = centerY - (centerY - masterplanPanY) * (masterplanZoom / prevZoom);
+            }
+            updateMasterplanTransform();
+        }
+
+        function resetMasterplanView() {
+            const viewport = document.getElementById('masterplanViewport');
+            if (!viewport) return;
+            const rect = viewport.getBoundingClientRect();
+            const scaleX = rect.width / 1000;
+            const scaleY = rect.height / 620;
+            masterplanZoom = Math.max(0.65, Math.min(scaleX, scaleY) * 0.95);
+            masterplanPanX = (rect.width - 1000 * masterplanZoom) / 2;
+            masterplanPanY = (rect.height - 620 * masterplanZoom) / 2;
+            updateMasterplanTransform();
+        }
+
+        function focusSector(sectorKey, targetX, targetY, zoomLevel = 1.4) {
+            const viewport = document.getElementById('masterplanViewport');
+            if (!viewport) return;
+            const rect = viewport.getBoundingClientRect();
+            
+            masterplanZoom = zoomLevel;
+            masterplanPanX = (rect.width / 2) - (targetX * masterplanZoom);
+            masterplanPanY = (rect.height / 2) - (targetY * masterplanZoom);
+            
+            gsap.to('#masterplanCanvas', {
+                duration: 0.6,
+                ease: 'power2.out',
+                transform: `translate(${masterplanPanX}px, ${masterplanPanY}px) scale(${masterplanZoom})`
+            });
+
+            const float = document.getElementById('mapCoordinatesFloat');
+            if (float) float.textContent = `Sector Enfocado: ${sectorKey} (${Math.round(targetX)}, ${Math.round(targetY)})`;
+        }
+
+        function toggleMapMarkMode() {
+            MAP_MARK_MODE = !MAP_MARK_MODE;
+            const btn = document.getElementById('btnToggleMarkMode');
+            const icon = document.getElementById('markModeIcon');
+            const text = document.getElementById('markModeText');
+            const banner = document.getElementById('mapInstructionBanner');
+            const viewport = document.getElementById('masterplanViewport');
+
+            if (MAP_MARK_MODE) {
+                btn.className = 'px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow transition';
+                icon.textContent = '🎯';
+                text.textContent = 'Modo Marcar: ACTIVO';
+                if (banner) banner.classList.remove('hidden');
+                if (viewport) viewport.style.cursor = 'crosshair';
+                showAlert('🎯 Modo Marcar ACTIVO: Haz clic en el plano para colocar un marcador.', 'info');
+            } else {
+                btn.className = 'px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition';
+                icon.textContent = '✋';
+                text.textContent = 'Modo Navegar';
+                if (banner) banner.classList.add('hidden');
+                if (viewport) viewport.style.cursor = 'grab';
+            }
+        }
+
+        function getMasterplanSectorName(x, y) {
+            if (y > 480 && x > 430 && x < 610) return 'Portón Principal & Conserjería';
+            if (y > 470 && x <= 430) return 'Estacionamientos de Visitas';
+            if (x < 460 && y < 220) return y < 140 ? 'Pasaje 1 (Casas 1-5)' : 'Pasaje 1 (Entrada Casas)';
+            if (x < 460 && y >= 280 && y < 390) return 'Pasaje 1 (Casas 6-10)';
+            if (x >= 550 && y < 220) return 'Pasaje 2 (Casas 11-15)';
+            if (x >= 550 && y >= 280 && y < 390) return 'Pasaje 2 (Casas 16-20)';
+            if (x >= 350 && x <= 650 && y < 130) return 'Torres Departamentos (A y B)';
+            if (x >= 140 && x <= 360 && y >= 380 && y <= 480) return 'Plaza de Juegos Infantiles';
+            if (x >= 580 && x <= 760 && y >= 380 && y <= 470) return 'Quincho Techado Comunitario';
+            if (x > 760 && y >= 380 && y <= 500) return 'Piscina Comunitaria';
+            if (x >= 440 && x <= 560) return 'Calzada Central de Distribución';
+            return 'Área Común / Jardines Perimetrales';
+        }
+
+        function onMasterplanCanvasClick(e) {
+            const canvas = document.getElementById('masterplanCanvas');
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+
+            const clientX = e.clientX;
+            const clientY = e.clientY;
+
+            // Coordenadas relativas al canvas escalado
+            const relX = clientX - rect.left;
+            const relY = clientY - rect.top;
+
+            // Escala a 1000x620
+            const worldX = Math.round((relX / rect.width) * 1000);
+            const worldY = Math.round((relY / rect.height) * 620);
+
+            if (worldX < 5 || worldX > 995 || worldY < 5 || worldY > 615) return;
+
+            // Mapeo a GPS Chileno equivalente
+            const lat = -33.48580 + (310 - worldY) * 0.000008;
+            const lng = -70.59860 + (worldX - 500) * 0.000008;
+
+            const sectorName = getMasterplanSectorName(worldX, worldY);
+            CURRENT_SELECTED_POINT = { worldX, worldY, lat, lng, sectorName };
+
+            // Renderizar marcador temporal
+            renderTempMasterplanPin(worldX, worldY);
+
+            // Mostrar tarjeta de creación
+            const card = document.getElementById('pointCreationCard');
+            if (card) {
+                card.classList.remove('hidden');
+                document.getElementById('pointCoordinatesDisplay').textContent = `${sectorName} | Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+                gsap.fromTo(card, { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3 });
+                document.getElementById('newPointTitle').focus();
+            }
+
+            const float = document.getElementById('mapCoordinatesFloat');
+            if (float) float.textContent = `Punto Seleccionado: ${sectorName} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        }
+
+        function renderTempMasterplanPin(x, y) {
+            const layer = document.getElementById('masterplanPinsLayer');
+            if (!layer) return;
+
+            const existingTemp = document.getElementById('tempMapPin');
+            if (existingTemp) existingTemp.remove();
+
+            const pin = document.createElement('div');
+            pin.id = 'tempMapPin';
+            pin.className = 'map-interactive-pin flex flex-col items-center pointer-events-auto';
+            pin.style.left = `${(x / 1000) * 100}%`;
+            pin.style.top = `${(y / 620) * 100}%`;
+            pin.innerHTML = `
+                <div class="relative flex items-center justify-center">
+                    <span class="absolute w-8 h-8 rounded-full bg-blue-500 opacity-60 animate-ping"></span>
+                    <span class="text-3xl drop-shadow-lg filter drop-shadow">📍</span>
+                </div>
+            `;
+            layer.appendChild(pin);
+        }
+
+        function cancelPointCreation() {
+            const existingTemp = document.getElementById('tempMapPin');
+            if (existingTemp) existingTemp.remove();
+
+            CURRENT_SELECTED_POINT = null;
+            const card = document.getElementById('pointCreationCard');
+            if (card) card.classList.add('hidden');
+            document.getElementById('newPointTitle').value = '';
+            document.getElementById('newPointNotes').value = '';
+        }
+
+        async function saveUserMarkedPoint() {
+            if (!CURRENT_SELECTED_POINT) {
+                showAlert('Por favor haz clic en el plano para marcar un punto.', 'error');
+                return;
+            }
+            const title = document.getElementById('newPointTitle').value.trim();
+            const category = document.getElementById('newPointCategory').value;
+            const notes = document.getElementById('newPointNotes').value.trim();
+
+            if (!title) {
+                showAlert('Ingresa un título para el punto marcado.', 'error');
+                document.getElementById('newPointTitle').focus();
+                return;
+            }
+
+            const fullNotes = CURRENT_SELECTED_POINT.sectorName 
+                ? `[${CURRENT_SELECTED_POINT.sectorName}] ${notes}`.trim() 
+                : notes;
+
+            const payload = {
+                title,
+                category,
+                latitude: CURRENT_SELECTED_POINT.lat,
+                longitude: CURRENT_SELECTED_POINT.lng,
+                notes: fullNotes || null
+            };
+
+            const res = await apiFetch('/api/map/points', {
+                method: 'POST',
+                body: payload
+            });
+
+            if (res && res.status === 'success') {
+                showAlert(`📍 ¡Punto <b>${title}</b> fijado en el plano!`, 'success');
+                cancelPointCreation();
+                loadMapPoints();
+            }
+        }
+
+        function createIncidentFromSelectedPoint() {
+            if (!CURRENT_SELECTED_POINT) return;
+            const title = document.getElementById('newPointTitle').value.trim();
+            const notes = document.getElementById('newPointNotes').value.trim();
+
+            document.getElementById('reportLat').value = CURRENT_SELECTED_POINT.lat;
+            document.getElementById('reportLng').value = CURRENT_SELECTED_POINT.lng;
+            document.getElementById('reportCoordsDisplay').value = `${CURRENT_SELECTED_POINT.lat.toFixed(5)}, ${CURRENT_SELECTED_POINT.lng.toFixed(5)}`;
+            document.getElementById('reportZone').value = 'MAPA_GPS';
+            if (title) document.getElementById('reportTitle').value = title;
+            if (notes) document.getElementById('reportDesc').value = `Sector: ${CURRENT_SELECTED_POINT.sectorName}. ${notes}`;
+
+            cancelPointCreation();
+            openReportModal();
+        }
+
+        function getCategoryPinData(cat) {
+            const map = {
+                SOS: { icon: '🚨', label: 'Alerta SOS', color: 'text-red-600', badgeBg: 'bg-red-500' },
+                SOS_PANIC: { icon: '🚨', label: 'Alerta SOS', color: 'text-red-600', badgeBg: 'bg-red-600' },
+                SUSPICIOUS: { icon: '⚠️', label: 'Sospechoso', color: 'text-amber-600', badgeBg: 'bg-amber-500' },
+                SUSPICIOUS_PERSON: { icon: '👤', label: 'Sospechoso', color: 'text-amber-600', badgeBg: 'bg-amber-500' },
+                STRANGE_VEHICLE: { icon: '🚗', label: 'Vehículo Extraño', color: 'text-amber-600', badgeBg: 'bg-amber-500' },
+                LIGHTING: { icon: '💡', label: 'Luminaria / Foco', color: 'text-yellow-600', badgeBg: 'bg-yellow-500' },
+                CAMERA: { icon: '📹', label: 'Cámara Seguridad', color: 'text-indigo-600', badgeBg: 'bg-indigo-600' },
+                GATE_OPEN: { icon: '🚪', label: 'Portón Abierto', color: 'text-red-600', badgeBg: 'bg-red-500' },
+                NOISE: { icon: '🔊', label: 'Ruidos Molestos', color: 'text-purple-600', badgeBg: 'bg-purple-600' },
+                PACKAGE: { icon: '📦', label: 'Encomienda', color: 'text-orange-600', badgeBg: 'bg-orange-500' },
+                PET: { icon: '🐾', label: 'Mascota', color: 'text-emerald-600', badgeBg: 'bg-emerald-600' },
+                INTEREST: { icon: '📌', label: 'Punto Interés', color: 'text-slate-700', badgeBg: 'bg-blue-600' }
+            };
+            return map[cat] || { icon: '📍', label: cat, color: 'text-blue-600', badgeBg: 'bg-blue-600' };
+        }
+
+        function latLngToMasterplan(lat, lng) {
+            let worldX = Math.round(500 + (lng - (-70.59860)) / 0.000008);
+            let worldY = Math.round(310 - (lat - (-33.48580)) / 0.000008);
+            worldX = Math.max(30, Math.min(970, worldX));
+            worldY = Math.max(30, Math.min(590, worldY));
+            return { worldX, worldY };
+        }
+
+        async function loadMapPoints() {
+            const data = await apiFetch('/api/map/points');
+            if (!data) return;
+
+            CACHED_MAP_POINTS = data.marked_points || [];
+            CACHED_INCIDENTS_FOR_MAP = data.incidents || [];
+
+            renderMasterplanPins();
+            renderMasterplanList();
+        }
+
+        function renderMasterplanPins() {
+            const layer = document.getElementById('masterplanPinsLayer');
+            if (!layer) return;
+
+            // Conservar el pin temporal si existe
+            const tempPin = document.getElementById('tempMapPin');
+            layer.innerHTML = '';
+            if (tempPin) layer.appendChild(tempPin);
+
+            // 1. Renderizar Puntos Marcados por Vecinos
+            CACHED_MAP_POINTS.forEach(pt => {
+                const info = getCategoryPinData(pt.category);
+                const pos = latLngToMasterplan(pt.latitude, pt.longitude);
+
+                const pinEl = document.createElement('div');
+                pinEl.className = 'map-interactive-pin group flex flex-col items-center pointer-events-auto';
+                pinEl.style.left = `${(pos.worldX / 1000) * 100}%`;
+                pinEl.style.top = `${(pos.worldY / 620) * 100}%`;
+                pinEl.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-white border-2 border-slate-300 flex items-center justify-center shadow-lg transition transform group-hover:scale-125">
+                        <span class="text-sm">${info.icon}</span>
+                    </div>
+                    <!-- Tooltip Flotante -->
+                    <div class="hidden group-hover:flex flex-col absolute bottom-9 z-50 bg-slate-900 text-white p-2 rounded-xl text-xs shadow-xl w-44 pointer-events-auto">
+                        <div class="flex items-center gap-1 font-bold text-white text-[11px]">
+                            <span>${info.icon}</span>
+                            <span>${pt.title}</span>
+                        </div>
+                        <p class="text-[10px] text-slate-300 mt-0.5">${pt.notes || 'Punto registrado'}</p>
+                        <div class="mt-1 pt-1 border-t border-slate-700 flex justify-between text-[9px] text-slate-400">
+                            <span>${pt.author_name} (${pt.house_unit})</span>
+                            <button onclick="event.stopPropagation(); deleteUserPoint(${pt.id})" class="text-red-400 hover:text-red-300 font-bold">Borrar</button>
+                        </div>
+                    </div>
+                `;
+                layer.appendChild(pinEl);
+            });
+
+            // 2. Renderizar Incidentes Oficiales Activos
+            CACHED_INCIDENTS_FOR_MAP.forEach(inc => {
+                const info = getCategoryPinData(inc.category);
+                const pos = latLngToMasterplan(inc.latitude, inc.longitude);
+
+                const pinEl = document.createElement('div');
+                pinEl.className = 'map-interactive-pin group flex flex-col items-center pointer-events-auto';
+                pinEl.style.left = `${(pos.worldX / 1000) * 100}%`;
+                pinEl.style.top = `${(pos.worldY / 620) * 100}%`;
+                pinEl.innerHTML = `
+                    <div class="relative flex items-center justify-center">
+                        <span class="absolute w-8 h-8 rounded-full bg-red-500 opacity-60 animate-ping"></span>
+                        <div class="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center shadow-2xl border-2 border-white text-base">
+                            <span>${info.icon}</span>
+                        </div>
+                    </div>
+                    <!-- Tooltip Flotante Alerta -->
+                    <div class="hidden group-hover:flex flex-col absolute bottom-10 z-50 bg-red-950 text-white p-2 rounded-xl text-xs shadow-2xl w-48 pointer-events-auto border border-red-700">
+                        <span class="bg-red-600 text-white font-black px-1 rounded text-[9px] w-max uppercase">🚨 ALERTA ACTIVA</span>
+                        <h5 class="font-bold text-white text-[11px] mt-1">${inc.title}</h5>
+                        <p class="text-[10px] text-slate-200">${inc.author_name} (${inc.house_unit})</p>
+                    </div>
+                `;
+                layer.appendChild(pinEl);
+            });
+        }
+
+        function renderMasterplanList() {
+            const container = document.getElementById('markedPointsListContainer');
+            const counter = document.getElementById('countMarkedPoints');
+            if (counter) counter.textContent = CACHED_MAP_POINTS.length + CACHED_INCIDENTS_FOR_MAP.length;
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            CACHED_MAP_POINTS.forEach(pt => {
+                const info = getCategoryPinData(pt.category);
+                const el = document.createElement('div');
+                el.className = 'p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs shadow-sm hover:border-blue-300 transition';
+                el.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xl p-1.5 bg-slate-50 rounded-lg">${info.icon}</span>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-slate-900">${pt.title}</span>
+                                <span class="text-[10px] bg-slate-100 ${info.color} px-1.5 py-0.5 rounded font-extrabold">${info.label}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500">${pt.notes || 'Punto registrado por residente'} • <span class="font-mono text-[10px] text-slate-400">Por ${pt.author_name} (${pt.house_unit})</span></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="focusPointOnMap(${pt.latitude}, ${pt.longitude})" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1.5 rounded-lg transition" title="Ver en Plano">
+                            🎯 Ver
+                        </button>
+                        <button onclick="deleteUserPoint(${pt.id})" class="text-xs text-slate-400 hover:text-red-600 p-1.5 rounded-lg transition" title="Eliminar">
+                            🗑️
+                        </button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+
+            if (CACHED_MAP_POINTS.length === 0 && CACHED_INCIDENTS_FOR_MAP.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No hay puntos marcados en el plano. Haz clic sobre cualquier zona para agregar uno.</p>';
+            }
+        }
+
+        function focusPointOnMap(lat, lng) {
+            const pos = latLngToMasterplan(lat, lng);
+            focusSector('PUNTO', pos.worldX, pos.worldY, 1.8);
+            const vp = document.getElementById('masterplanViewport');
+            if (vp) window.scrollTo({ top: vp.offsetTop - 70, behavior: 'smooth' });
+        }
+
+        async function deleteUserPoint(id) {
+            const res = await apiFetch(`/api/map/points/${id}`, { method: 'DELETE' });
+            if (res) {
+                showAlert('Punto eliminado del plano.', 'info');
+                loadMapPoints();
+            }
+        }
+
+        async function triggerSOSPanic() {
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 500]);
+            
+            // Animación de impacto GSAP
+            gsap.to('body', { x: 5, yoyo: true, repeat: 5, duration: 0.05 });
+
+            const res = await apiFetch('/api/incidents', {
+                method: 'POST',
+                body: {
+                    category: 'SOS_PANIC',
+                    title: `🚨 ALERTA SOS ACTIVADA`,
+                    description: `El residente ${CURRENT_USER.full_name} (${CURRENT_USER.house_unit}) activó el botón de pánico SOS.`,
+                    zone: 'ACCESO_PORTON'
+                }
+            });
+
+            if (res && res.status === 'success') {
+                showAlert('🚨 <b>¡ALERTA SOS DIFUNDIDA!</b> Todos los vecinos han recibido la notificación.', 'error');
+                loadIncidents();
+            }
+        }
+
+        async function loadIncidents() {
+            const data = await apiFetch('/api/incidents');
+            if (!data) return;
+            const container = document.getElementById('activeAlertsList');
+            container.innerHTML = '';
+
+            const activeSOS = data.filter(i => i.is_active && i.category.startsWith('SOS_'));
+            if (activeSOS.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No hay alertas de emergencia activas.</p>';
+            } else {
+                activeSOS.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = 'p-3.5 rounded-xl bg-red-50 border-2 border-red-400 text-xs space-y-1.5 shadow-sm';
+                    el.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="bg-red-600 text-white font-black px-2 py-0.5 rounded text-[10px] uppercase">🚨 ALERTA ACTIVA</span>
+                            <span class="text-slate-400 font-mono text-[10px]">${item.created_at}</span>
+                        </div>
+                        <p class="font-extrabold text-red-950 text-sm">${item.title}</p>
+                        <p class="text-red-900">${item.description}</p>
+                        <div class="flex justify-between items-center pt-1 border-t border-red-200">
+                            <span class="text-red-800 font-bold">${item.author_name} (${item.house_unit})</span>
+                            <button onclick="resolveIncident(${item.id})" class="text-[10px] bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded-lg font-bold">
+                                Marcar Resuelto ✓
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+        }
+
+        async function resolveIncident(id) {
+            const res = await apiFetch(`/api/incidents/${id}/resolve`, { method: 'POST' });
+            if (res) { showAlert('Incidente marcado como resuelto.', 'success'); loadIncidents(); loadPredictive(); }
+        }
+
+        async function loadPredictive() {
+            const data = await apiFetch('/api/predictive/improvements');
+            if (!data) return;
+            document.getElementById('statSecurityScore').textContent = `${data.security_score} / 100`;
+
+            const container = document.getElementById('predictiveOpportunitiesList');
+            container.innerHTML = '';
+
+            data.improvements.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 shadow-sm';
+                el.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-800 text-sm">${item.action_title}</span>
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${item.priority === 'ALTA' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">${item.priority}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500">📍 <b>Sector:</b> ${item.sector} | <b>Patrón:</b> ${item.detected_pattern}</p>
+                    <p class="text-slate-700 leading-relaxed">${item.action_description}</p>
+                    <div class="flex justify-between items-center pt-1 text-[11px] text-slate-500 font-medium">
+                        <span>Costo estimado: <b>${item.estimated_cost_clp}</b></span>
+                        <span class="text-blue-600 font-bold">Oportunidad Preventiva ✓</span>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // Módulos Comunitarios
+        async function loadPackages() {
+            const data = await apiFetch('/api/packages');
+            const c = document.getElementById('packagesListContainer');
+            if (!data || data.length === 0) {
+                c.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No hay encomiendas pendientes registradas.</p>';
+                return;
+            }
+            c.innerHTML = '';
+            data.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs shadow-sm';
+                el.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-bold text-slate-900">${p.carrier}</span>
+                            <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold font-mono">Para: ${p.target_house_unit}</span>
+                            <span class="text-[10px] ${p.status === 'DELIVERED' ? 'text-emerald-600' : 'text-blue-600'} font-bold">
+                                ${p.status === 'DELIVERED' ? '✓ Entregado' : '📦 En custodia de ' + p.receiver_house_unit}
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Recibido por: ${p.receiver_name} (${p.receiver_house_unit}) • ${p.created_at}</p>
+                    </div>
+                    ${p.status !== 'DELIVERED' ? `
+                        <button onclick="deliverPackageAction(${p.id})" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg">Entregado</button>
+                    ` : ''}
+                `;
+                c.appendChild(el);
+            });
+        }
+
+        async function deliverPackageAction(id) {
+            const res = await apiFetch(`/api/packages/${id}/deliver`, { method: 'POST' });
+            if (res) { showAlert('Encomienda marcada como entregada.', 'success'); loadPackages(); }
+        }
+
+        async function loadPets() {
+            const data = await apiFetch('/api/pets');
+            const c = document.getElementById('petsListContainer');
+            if (!data || data.length === 0) {
+                c.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No hay avisos de mascotas activas.</p>';
+                return;
+            }
+            c.innerHTML = '';
+            data.forEach(pet => {
+                const el = document.createElement('div');
+                el.className = 'p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1 shadow-sm';
+                el.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-900 text-sm">🐾 ${pet.pet_name} (${pet.pet_type})</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded ${pet.status === 'LOST' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">${pet.status === 'LOST' ? 'Extraviado/a' : 'Encontrado/a'}</span>
+                    </div>
+                    <p class="text-slate-600">${pet.description}</p>
+                    <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+                        <a href="tel:${pet.contact_phone}" class="text-blue-600 font-bold">📞 Contactar: ${pet.contact_phone}</a>
+                        ${pet.status === 'LOST' ? `<button onclick="resolvePetAction(${pet.id})" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">Marcar Encontrado</button>` : ''}
+                    </div>
+                `;
+                c.appendChild(el);
+            });
+        }
+
+        async function resolvePetAction(id) {
+            const res = await apiFetch(`/api/pets/${id}/resolve`, { method: 'POST' });
+            if (res) { showAlert('Estado de mascota actualizado.', 'success'); loadPets(); }
+        }
+
+        async function loadSupport() {
+            const data = await apiFetch('/api/support');
+            const c = document.getElementById('supportListContainer');
+            if (!data || data.length === 0) {
+                c.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No hay solicitudes de apoyo registradas.</p>';
+                return;
+            }
+            c.innerHTML = '';
+            data.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1 shadow-sm';
+                el.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-900">${s.title}</span>
+                        <span class="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold">${s.house_unit}</span>
+                    </div>
+                    <p class="text-slate-600">${s.description}</p>
+                `;
+                c.appendChild(el);
+            });
+        }
+
+        async function loadAmenities() {
+            const data = await apiFetch('/api/amenities');
+            const c = document.getElementById('amenitiesListContainer');
+            if (!data) return;
+            c.innerHTML = '';
+            data.forEach(a => {
+                const el = document.createElement('div');
+                el.className = 'p-3 rounded-xl border bg-slate-50 border-slate-200 text-xs space-y-1';
+                el.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-900">${a.name}</span>
+                        <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded ${a.status === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                            ${a.status === 'AVAILABLE' ? 'Disponible' : 'Mantención'}
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-500">${a.rules_info || 'Capacidad: ' + a.capacity + ' personas'}</p>
+                `;
+                c.appendChild(el);
+            });
+        }
+
+        async function loadResidents() {
+            const data = await apiFetch('/api/subadmin/residents');
+            const c = document.getElementById('residentsListTable');
+            if (!data || !c) return;
+            c.innerHTML = '';
+            data.forEach(r => {
+                const el = document.createElement('div');
+                el.className = 'p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs';
+                el.innerHTML = `
+                    <div>
+                        <span class="font-bold text-slate-900">${r.full_name}</span>
+                        <span class="text-[10px] font-bold text-blue-600 ml-1 font-mono">${r.house_unit}</span>
+                        <p class="text-[10px] text-slate-400 font-mono">${r.phone}</p>
+                    </div>
+                    <div>
+                        ${!r.is_approved ? `
+                            <button onclick="approveResidentAction(${r.id}, true)" class="bg-emerald-600 text-white px-2 py-1 rounded-lg text-xs font-bold">Aprobar</button>
+                        ` : `
+                            <span class="text-emerald-700 font-bold text-xs">✓ Validado</span>
+                        `}
+                    </div>
+                `;
+                c.appendChild(el);
+            });
+        }
+
+        async function approveResidentAction(id, approve) {
+            const res = await apiFetch('/api/subadmin/approve-resident', {
+                method: 'POST',
+                body: { user_id: id, approve }
+            });
+            if (res) { showAlert('Vecino validado exitosamente.', 'success'); loadResidents(); }
+        }
+
+        // Modales y Envíos
+        function openReportModal() { document.getElementById('reportModal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('reportModal').classList.add('hidden'); }
+        function openPackageModal() { document.getElementById('packageModal').classList.remove('hidden'); }
+        function closePackageModal() { document.getElementById('packageModal').classList.add('hidden'); }
+
+        async function submitReportWithImage() {
+            const category = document.getElementById('reportCategory').value;
+            const zone = document.getElementById('reportZone').value;
+            const title = document.getElementById('reportTitle').value.trim();
+            const description = document.getElementById('reportDesc').value.trim();
+            const image_data = document.getElementById('reportBase64').value || null;
+            const latVal = document.getElementById('reportLat').value;
+            const lngVal = document.getElementById('reportLng').value;
+            const latitude = latVal ? parseFloat(latVal) : null;
+            const longitude = lngVal ? parseFloat(lngVal) : null;
+
+            if (!title || !description) { showAlert('Completa el título y descripción.', 'warning'); return; }
+
+            const res = await apiFetch('/api/incidents', {
+                method: 'POST',
+                body: { category, title, description, zone, image_data, latitude, longitude }
+            });
+
+            if (res) {
+                showAlert('Reporte e imagen publicados con éxito.', 'success');
+                closeReportModal();
+                loadIncidents();
+                loadPredictive();
+                loadMapPoints();
+            }
+        }
+
+        async function submitPackage() {
+            const target_house_unit = document.getElementById('pkgTargetUnit').value.trim();
+            const carrier = document.getElementById('pkgCarrier').value.trim();
+            const image_data = document.getElementById('pkgBase64').value || null;
+
+            if (!target_house_unit || !carrier) { showAlert('Ingresa casa y empresa de envío.', 'warning'); return; }
+
+            const res = await apiFetch('/api/packages', {
+                method: 'POST',
+                body: { target_house_unit, receiver_house_unit: CURRENT_USER ? CURRENT_USER.house_unit : 'Casa 1', carrier, image_data }
+            });
+
+            if (res) {
+                showAlert('Encomienda registrada con éxito.', 'success');
+                closePackageModal();
+                loadPackages();
+            }
+        }
+
+        // Inicialización
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
