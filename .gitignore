@@ -9,3 +9,7 @@ recordings/
 .next/
 dist/
 build/
+
+*.db
+*.sqlite
+*.sqlite3
